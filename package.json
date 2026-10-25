@@ -1,0 +1,26 @@
+{
+  "name": "senpilot-regulatory-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "tsx src/cli.ts worker",
+    "dev": "tsx src/cli.ts",
+    "collect": "tsx src/cli.ts collect",
+    "doctor": "tsx src/cli.ts doctor",
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "playwright": "1.64.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}
