@@ -1,8 +1,9 @@
 # Project instructions
 
-Build the TypeScript application described in the README and user brief. The
-`agent-experiment/` folder contains an earlier, separate workflow experiment;
-its no-code instructions do not govern this application.
+These instructions apply to the TypeScript implementation under `src/`,
+`test/`, `scripts/`, and `docs/`, as described in the README and user brief.
+`agent-experiment/` is an independent approach owned by another agent: do not
+edit it or apply these implementation instructions to its workflow.
 
 - Keep API keys, mailbox content, runtime state, and downloaded files out of Git.
 - Never print credential values. Load local secrets from `.env`.

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "tsx src/cli.ts worker",
     "dev": "tsx src/cli.ts",
@@ -11,15 +13,17 @@
     "doctor": "tsx src/cli.ts doctor",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "format": "prettier --write src test scripts docs README.md AGENTS.md package.json tsconfig.json",
+    "format:check": "prettier --check src test scripts docs README.md AGENTS.md package.json tsconfig.json"
   },
   "dependencies": {
     "fflate": "0.8.3",
-    "playwright": "1.64.1",
-    "zod": "4.6.7"
+    "playwright": "1.64.1"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
+    "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "7.0.2"
   }
