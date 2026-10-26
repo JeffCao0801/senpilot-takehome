@@ -14,9 +14,18 @@ npm run format:check
 bash -n scripts/setup-ubuntu.sh
 ```
 
-Final result: **58 passed, zero failed, zero skipped**. Type checking, build,
+Original acceptance result: **58 passed, zero failed, zero skipped**. Type checking, build,
 formatting and shell syntax checks passed. The default `npm test` skips the
 opt-in live inference and browser checks. Live inference consumes Codex usage.
+
+The October 26 improvement pass passed **66 tests, zero failed, zero skipped**
+with both live flags enabled, plus type checking and build. It adds coverage
+for exact inline/Drive boundary selection, delayed virtual rows with headers,
+subject/body conflicts, automatic parsing, unsupported selection constraints,
+multiple files from one source entry and accurate attachment/failure wording.
+A new live M10431 collection again verified all ten transcripts with a
+7,246,384-byte ZIP. Mailbox read/login checks passed; no additional live email
+was sent during this pass. See [improvement measurements](IMPROVEMENTS.md).
 
 Coverage includes request validation and ambiguity, isolated model execution,
 auth refresh persistence, source row identity, metadata and category counts,

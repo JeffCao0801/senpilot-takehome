@@ -51,6 +51,17 @@ deployment was requested. The independent approach at
 
 ## Handoff
 
+On October 26 the applicant requested exploration of efficiency and response
+quality. Two read-only delegated reviews informed a focused improvement pass:
+avoid throwaway base64 allocation for large ZIPs, use indexed existence queries
+for deduplication, wait for actual virtual-row changes, remove rejected downloads,
+and avoid retries for deterministic file-format failures. Replies now distinguish
+source entries, downloaded files and attached files, map filenames to sources,
+and explain failures without browser internals. Parsing checks subject and body
+together and clarifies unsupported selection constraints. An opt-in `auto` mode
+uses the existing safe rules path to avoid unnecessary model calls; the default
+remains `codex`. Measurements and follow-up validation are in `IMPROVEMENTS.md`.
+
 The code and documentation are prepared locally. Runtime credentials, downloaded
 documents and mailbox evidence are excluded from Git. The worker is stopped at
 handoff so the applicant can transfer its journal and start one service on Ubuntu.

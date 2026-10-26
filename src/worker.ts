@@ -18,7 +18,7 @@ import {
 } from "./mail.js";
 import { JobStore, type StoredJob } from "./store.js";
 import { parseRequest } from "./parser.js";
-import { collectDocuments } from "./collector.js";
+import { collectDocuments, isPermanentDocumentFailure } from "./collector.js";
 import { renderReply } from "./summary.js";
 import type { Config } from "./config.js";
 import type { IncomingMessage } from "./types.js";
@@ -114,22 +114,16 @@ async function processJob(
     let request = job.request;
     let clarification: string | undefined;
     if (!request) {
-      // Body-first keeps rules-only mode usable with ordinary subject lines;
-      // if it is incomplete, the subject can supply the missing request fields.
-      const input =
-        config.parserMode === "rules"
-          ? job.message.text
-          : `${job.message.subject}\n\n${job.message.text}`;
-      let parsed = await parseRequest(input, {
-        mode: config.parserMode,
-        model: config.codexModel,
-        codexPath: config.codexPath,
-      });
-      if (config.parserMode === "rules" && parsed.kind === "clarification")
-        parsed = await parseRequest(
-          `${job.message.subject}\n\n${job.message.text}`,
-          { mode: "rules" },
-        );
+      // Check both fields together so a body fast path cannot hide conflicting
+      // matter/category instructions in the subject.
+      const parsed = await parseRequest(
+        `${job.message.subject}\n\n${job.message.text}`,
+        {
+          mode: config.parserMode,
+          model: config.codexModel,
+          codexPath: config.codexPath,
+        },
+      );
       if (parsed.kind === "clarification") {
         if (/^Codex\b/.test(parsed.message)) {
           log({
@@ -166,10 +160,7 @@ async function processJob(
         log: (event) => log({ jobId: job.id, ...event }),
       });
       const retryable = result.failures.some(
-        (f) =>
-          !/(?:byte budget|size limit|unsupported file format|unknown media format|security is)/i.test(
-            f.reason,
-          ),
+        (f) => !isPermanentDocumentFailure(f.reason),
       );
       if (
         result.status === "failed" &&
@@ -312,7 +303,7 @@ export async function runWorker(
         const incoming = (
           await mail.listIncoming({
             after,
-            skipMessage: (id) => Boolean(store.get(config.inboxId, id)),
+            skipMessage: (id) => store.has(config.inboxId, id),
           })
         ).filter(
           (m) =>

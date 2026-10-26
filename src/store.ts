@@ -155,6 +155,15 @@ export class JobStore {
     );
   }
 
+  /** Indexed duplicate check without loading or decoding stored mailbox/result JSON. */
+  has(inboxId: string, messageId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare("SELECT 1 FROM jobs WHERE inbox_id=? AND message_id=?")
+        .get(inboxId, messageId),
+    );
+  }
+
   get(inboxId: string, messageId: string): StoredJob | undefined {
     return this.decode(
       this.db

@@ -44,6 +44,12 @@ const clean = (s: string): string => s.replace(/\u00a0/g, " ").trim();
 const errorText = (e: unknown): string =>
   e instanceof Error ? e.message.split("\n")[0] : String(e);
 
+export function isPermanentDocumentFailure(reason: string): boolean {
+  return /(?:byte budget|size limit|file signature|HTML page|(?:un)?supported file format|unknown media format|security is)/i.test(
+    reason,
+  );
+}
+
 export async function waitForBoundedDownload(
   download: Download,
   directory: string,
@@ -287,6 +293,36 @@ async function closeDownloadDialog(page: Page): Promise<void> {
   }
 }
 
+/** Observe identical DOM fields on both sides, including headers/empty grid rows. */
+export async function waitForDocumentRowsChange(
+  page: Page,
+  action: () => Promise<unknown>,
+  timeout = 4000,
+): Promise<void> {
+  const snapshot = () =>
+    JSON.stringify(
+      Array.from(document.querySelectorAll('[role="row"]')).map((row) =>
+        Array.from(row.querySelectorAll(".fm-textarea .text")).map((e) =>
+          (e.textContent ?? "").trim(),
+        ),
+      ),
+    );
+  const before = await page.evaluate(snapshot);
+  await action();
+  await page.waitForFunction(
+    (before) =>
+      JSON.stringify(
+        Array.from(document.querySelectorAll('[role="row"]')).map((row) =>
+          Array.from(row.querySelectorAll(".fm-textarea .text")).map((e) =>
+            (e.textContent ?? "").trim(),
+          ),
+        ),
+      ) !== before,
+    before,
+    { timeout },
+  );
+}
+
 export async function collectDocuments(
   request: AgentRequest,
   options: CollectorOptions = {},
@@ -393,25 +429,11 @@ export async function collectDocuments(
         if (++scrollAttempts > 20) break;
         const scroller = page.locator(".v-grid-scroller-vertical");
         if (!(await scroller.count())) break;
-        const before = JSON.stringify(rows.map((r) => r.key));
-        await scroller.evaluate((el) => {
-          el.scrollTop += Math.max(150, el.clientHeight - 140);
-        });
         try {
-          await page.waitForFunction(
-            (before) =>
-              JSON.stringify(
-                Array.from(document.querySelectorAll('[role="row"]')).map(
-                  (row) =>
-                    JSON.stringify(
-                      Array.from(
-                        row.querySelectorAll(".fm-textarea .text"),
-                      ).map((e) => (e.textContent ?? "").trim()),
-                    ),
-                ),
-              ) !== before,
-            before,
-            { timeout: 4000 },
+          await waitForDocumentRowsChange(page, () =>
+            scroller.evaluate((el) => {
+              el.scrollTop += Math.max(150, el.clientHeight - 140);
+            }),
           );
           stagnant = 0;
         } catch {
@@ -524,43 +546,49 @@ export async function collectDocuments(
             // is still receiving, so a recording cannot grow without a disk bound.
             await waitForBoundedDownload(download, pendingDirectory, maxBytes);
             let path = join(directory, "documents", filename);
-            await download.saveAs(path);
-            await download.delete();
-            const size = (await stat(path)).size;
-            if (
-              size > (options.maxFileBytes ?? 25 * 1024 * 1024) ||
-              totalBytes + size > 50 * 1024 * 1024
-            ) {
-              await rm(path);
-              throw new Error(
-                "Document exceeds the configured download size limit",
-              );
-            }
-            const bytes = await readFile(path);
-            if (
-              request.category === "Recordings" &&
-              filename.endsWith(".bin")
-            ) {
-              const extension = detectMediaExtension(bytes);
-              if (!extension)
+            try {
+              await download.saveAs(path);
+              await download.delete();
+              const size = (await stat(path)).size;
+              if (
+                size > (options.maxFileBytes ?? 25 * 1024 * 1024) ||
+                totalBytes + size > 50 * 1024 * 1024
+              ) {
                 throw new Error(
-                  "Downloaded recording has an unknown media format",
+                  "Document exceeds the configured download size limit",
                 );
-              filename = filename.slice(0, -4) + extension;
-              const renamed = join(directory, "documents", filename);
-              await rename(path, renamed);
-              path = renamed;
+              }
+              const bytes = await readFile(path);
+              if (
+                request.category === "Recordings" &&
+                filename.endsWith(".bin")
+              ) {
+                const extension = detectMediaExtension(bytes);
+                if (!extension)
+                  throw new Error(
+                    "Downloaded recording has an unknown media format",
+                  );
+                filename = filename.slice(0, -4) + extension;
+                const renamed = join(directory, "documents", filename);
+                await rename(path, renamed);
+                path = renamed;
+              }
+              verifyDocument(bytes, filename);
+              const { key, fieldId, ...documentMetadata } = next;
+              result.documents.push({
+                ...documentMetadata,
+                filename,
+                path,
+                bytes: bytes.length,
+                sha256: sha256(bytes),
+              });
+              totalBytes += bytes.length;
+            } catch (error) {
+              // Rejected files must not accumulate outside the verified byte budget.
+              await rm(path, { force: true }).catch(() => {});
+              await download.delete().catch(() => {});
+              throw error;
             }
-            verifyDocument(bytes, filename);
-            const { key, fieldId, ...documentMetadata } = next;
-            result.documents.push({
-              ...documentMetadata,
-              filename,
-              path,
-              bytes: bytes.length,
-              sha256: sha256(bytes),
-            });
-            totalBytes += bytes.length;
           }
           downloaded = true;
           await closeDownloadDialog(page);
@@ -578,11 +606,7 @@ export async function collectDocuments(
               : String(error),
           );
           await closeDownloadDialog(page).catch(() => {});
-          if (
-            /(?:byte budget|size limit|file signature|HTML page)/i.test(
-              errorText(error),
-            )
-          ) {
+          if (isPermanentDocumentFailure(errorText(error))) {
             result.failures.push({
               documentId: next.documentId,
               reason: errorText(error),

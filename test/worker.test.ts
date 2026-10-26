@@ -12,6 +12,7 @@ import {
 import { JobStore } from "../src/store.js";
 import type { Config } from "../src/config.js";
 import type { IncomingMessage } from "../src/types.js";
+import { chromium } from "playwright";
 const message: IncomingMessage = {
   messageId: "m",
   inboxId: "agent@agentmail.to",
@@ -21,6 +22,81 @@ const message: IncomingMessage = {
   timestamp: "2026-10-25T00:00:00Z",
   labels: ["received"],
 };
+
+test("email worker clarifies conflicting subjects instead of collecting the body's request", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "senpilot-conflict-"));
+  const sent: string[] = [];
+  const rows = [
+    { ...message, message_id: "matter-conflict", subject: "M54321 Exhibits" },
+    {
+      ...message,
+      message_id: "category-conflict",
+      subject: "M12205 Transcripts",
+    },
+  ].map((value) => ({
+    ...value,
+    inbox_id: message.inboxId,
+    thread_id: value.message_id,
+    timestamp: new Date().toISOString(),
+  }));
+  const browser = t.mock.method(chromium, "launch", async () => {
+    throw new Error("Unexpected browser launch");
+  });
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (init?.method === "POST") {
+        sent.push(JSON.parse(init.body as string).text);
+        const id = url.pathname.split("/").at(-2)!;
+        return new Response(
+          JSON.stringify({ message_id: `sent-${id}`, thread_id: id }),
+        );
+      }
+      return new Response(
+        JSON.stringify(
+          url.pathname.endsWith("/messages")
+            ? { messages: rows, count: 2 }
+            : rows.find((row) => url.pathname.endsWith(row.message_id)),
+        ),
+      );
+    },
+  );
+  try {
+    await runWorker(
+      {
+        apiKey: "test-placeholder",
+        inboxId: message.inboxId,
+        baseUrl: "https://api.agentmail.to/v0",
+        dataDirectory: directory,
+        pollMs: 5000,
+        dailyCap: 5,
+        parserMode: "rules",
+        codexPath: "/never/start/codex",
+        allowedSenders: [],
+        headless: true,
+        maxAttempts: 2,
+        retentionDays: 7,
+      },
+      { once: true },
+    );
+    assert.equal(browser.mock.callCount(), 0);
+    assert.equal(sent.length, 2);
+    assert.ok(sent.some((text) => /one matter/.test(text)));
+    assert.ok(sent.some((text) => /one document category/.test(text)));
+    const store = new JobStore(join(directory, "jobs.sqlite"));
+    try {
+      assert.ok(
+        store.list().every((job) => job.state === "complete" && !job.request),
+      );
+    } finally {
+      store.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("worker retries an explicit send rate-limit rejection without re-sending immediately", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "senpilot-send-retry-"));

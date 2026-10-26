@@ -101,6 +101,10 @@ These laptop-specific settings have not been changed or tested from the Mac.
 - Default: one sequential browser job, poll every 20 seconds, 20 job attempts
   per UTC day, at most two processing attempts per message. A retry consumes
   another daily slot. `DAILY_REQUEST_LIMIT=0` pauses job processing.
+- `PARSER_MODE=auto` is an optional latency/usage optimization: simple canonical
+  requests use validated rules; other wording uses Codex. `codex` remains the
+  default for demonstrating model interpretation. Custom counts, date ranges
+  and sorting are clarified because collection uses the website's default order.
 - Change `ALLOWED_SENDERS` to a comma-separated list during testing, or leave
   it empty so Senpilot can email the inbox. Automated mail/self replies are ignored.
 - Codex uses your ChatGPT/Codex allowance and applicable credits. There is no

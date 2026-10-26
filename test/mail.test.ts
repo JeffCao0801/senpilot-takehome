@@ -261,6 +261,62 @@ test("exact UTF-8 whole request size is checked before sending, including base64
   assert.equal(sentBytes, 0);
 });
 
+test("inline/Drive selection matches actual UTF-8 JSON size at the base64 boundary", async (t) => {
+  const text = 'Résumé: "files"\n';
+  const scaffold = {
+    to: ["requester@example.test"],
+    reply_all: false,
+    text,
+    attachments: [
+      { filename: "result.zip", content_type: "application/zip", content: "" },
+    ],
+  };
+  const maxInlineRaw =
+    Math.floor(
+      (MAX_SEND_BYTES - Buffer.byteLength(JSON.stringify(scaffold))) / 4,
+    ) * 3;
+  const zipOverhead = zipSync(
+    { "exhibit.txt": new Uint8Array() },
+    { level: 0 },
+  ).length;
+  for (const offset of [-2, -1, 0, 1]) {
+    const { path, bytes } = await zipFixture(
+      t,
+      maxInlineRaw + offset - zipOverhead,
+    );
+    const actualBody = JSON.stringify({
+      ...scaffold,
+      attachments: [
+        { ...scaffold.attachments[0], content: bytes.toString("base64") },
+      ],
+    });
+    const shouldInline = Buffer.byteLength(actualBody) <= MAX_SEND_BYTES;
+    let calls = 0;
+    t.mock.method(
+      globalThis,
+      "fetch",
+      async (input: string | URL | Request, init?: RequestInit) => {
+        calls++;
+        if (shouldInline) {
+          assert.match(String(input), /\/reply$/);
+          assert.equal(init?.body, actualBody);
+          return json({ message_id: "sent", thread_id: "thread-1" });
+        }
+        assert.match(String(input), /\/files$/);
+        return json({}, 403);
+      },
+    );
+    if (shouldInline) await client().reply(message, text, path);
+    else
+      await assert.rejects(
+        client().reply(message, text, path),
+        /Drive attachment preparation unavailable/,
+      );
+    assert.equal(calls, 1);
+    t.mock.restoreAll();
+  }
+});
+
 test("large ZIP is staged as an actual remote email attachment with exact bytes, checksum and isolated headers", async (t) => {
   const { path, bytes } = await zipFixture(t, 10_360_603);
   let metadata: Record<string, unknown> = {};

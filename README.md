@@ -69,10 +69,17 @@ npm run build
 ```
 
 `PARSER_MODE=codex` is the default and forces a bounded Codex call for
-otherwise valid requests. `PARSER_MODE=rules` supports simple canonical
+otherwise valid requests. `PARSER_MODE=auto` avoids model latency/usage for
+simple canonical requests and uses Codex for other wording. Both email subject
+and body are checked for conflicting instructions before either path.
+`PARSER_MODE=rules` supports simple canonical
 requests without model usage. Missing/multiple matter numbers or categories
 can be rejected before an inference call. An optional `CODEX_MODEL` selects
 a model available to your Codex account.
+
+The collector retrieves up to ten files in the website's default order.
+Requests for a custom count, date range or sorting receive a clarification;
+they are not silently treated as the default selection.
 
 ## Design and tradeoffs
 
@@ -80,6 +87,7 @@ a model available to your Codex account.
   The first scan reads eligible inbox history unless `START_AFTER` is set.
   Subsequent scans overlap by one day to tolerate delayed mail; known message
   IDs are skipped before fetching bodies. No webhook server is needed.
+  Duplicate checks use an indexed existence query without decoding old jobs.
 - **Interpretation:** a fresh, isolated `codex exec` with a structured output
   schema and disabled tools, plugins, MCP, hooks and project guidance. Only
   ChatGPT auth is copied into the subprocess; mailbox secrets are excluded.
@@ -96,6 +104,8 @@ a model available to your Codex account.
   Agent Drive, then its short-lived signed URL is supplied as an attachment
   source to AgentMail. The user receives a regular ZIP attachment, not a link.
   Staged files expire after 24 hours.
+  Inline size is calculated before base64 encoding, avoiding large throwaway
+  strings for ZIPs that need Drive.
 - **Persistence:** SQLite journals jobs by inbox + incoming message ID. A
   process lock prevents competing workers. Processing may retry once; sending
   is journaled before the provider call and uncertain sends are quarantined
@@ -112,6 +122,8 @@ category lists may overlap. Dates retain the site's MM/DD/YYYY format.
 ## Validation and limitations
 
 See **[test evidence](docs/TESTING.md)** for actual automated and live checks.
+See **[improvement measurements](docs/IMPROVEMENTS.md)** for the later efficiency
+and response-quality pass.
 The 10-document M12205 ZIP was received in Gmail, downloaded, and verified
 byte-for-byte against the sent archive. This is recipient-side evidence,
 separate from AgentMail accepting a send.

@@ -62,6 +62,15 @@ test("duplicate request key is inbox plus message ID and retains original source
   );
   assert.equal(store.list().length, 2);
   assert.equal(
+    store.has("agent@agentmail.to", "quote' ; DROP TABLE jobs; --"),
+    true,
+  );
+  assert.equal(
+    store.has("unrelated@agentmail.to", "quote' ; DROP TABLE jobs; --"),
+    false,
+  );
+  assert.equal(store.has("agent@agentmail.to", "missing"), false);
+  assert.equal(
     store.get("agent@agentmail.to", "quote' ; DROP TABLE jobs; --")?.message
       .from,
     message().from,

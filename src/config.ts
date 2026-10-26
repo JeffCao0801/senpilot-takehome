@@ -9,7 +9,7 @@ export interface Config {
   dataDirectory: string;
   pollMs: number;
   dailyCap: number;
-  parserMode: "codex" | "rules";
+  parserMode: "codex" | "rules" | "auto";
   codexModel?: string;
   codexPath: string;
   allowedSenders: string[];
@@ -44,8 +44,8 @@ export function loadConfig(requireMail = true): Config {
       "AgentMail base URL must be an official HTTPS API endpoint",
     );
   const parserMode = e.PARSER_MODE ?? "codex";
-  if (parserMode !== "codex" && parserMode !== "rules")
-    throw new Error("PARSER_MODE must be codex or rules");
+  if (!["codex", "rules", "auto"].includes(parserMode))
+    throw new Error("PARSER_MODE must be codex, rules or auto");
   if (e.START_AFTER && !Number.isFinite(Date.parse(e.START_AFTER)))
     throw new Error("START_AFTER must be an ISO timestamp");
   return {
@@ -55,7 +55,7 @@ export function loadConfig(requireMail = true): Config {
     dataDirectory: resolve(e.DATA_DIR ?? "data"),
     pollMs: integer("POLL_SECONDS", 20, 5, 3600) * 1000,
     dailyCap: integer("DAILY_REQUEST_LIMIT", 20, 0, 100),
-    parserMode,
+    parserMode: parserMode as Config["parserMode"],
     codexModel: e.CODEX_MODEL || undefined,
     codexPath: e.CODEX_PATH ?? "codex",
     allowedSenders: (e.ALLOWED_SENDERS ?? "")

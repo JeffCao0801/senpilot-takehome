@@ -541,14 +541,18 @@ export class AgentMailClient {
       const bytes = await readFile(zipPath);
       checkRawSize(bytes.length);
       const attachment = { filename, content_type: "application/zip" };
-      payload.attachments = [
-        { ...attachment, content: bytes.toString("base64") },
-      ];
-      if (Buffer.byteLength(JSON.stringify(payload), "utf8") > MAX_SEND_BYTES) {
+      const inline = { ...attachment, content: "" };
+      payload.attachments = [inline];
+      // Base64 needs no JSON escaping. Measure its exact size without allocating
+      // a large encoded string and throwaway JSON body for Drive-bound ZIPs.
+      const inlineBytes =
+        Buffer.byteLength(JSON.stringify(payload), "utf8") +
+        4 * Math.ceil(bytes.length / 3);
+      if (inlineBytes > MAX_SEND_BYTES) {
         const staged = await this.stageZip(messageId, bytes);
         payload.attachments = [{ ...attachment, url: staged.url }];
         expires = staged.expires;
-      }
+      } else inline.content = bytes.toString("base64");
     }
     const body = JSON.stringify(payload);
     checkSize(body);

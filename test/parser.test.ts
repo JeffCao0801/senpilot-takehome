@@ -94,7 +94,7 @@ test("rules parse every canonical category, normalize case, and deduplicate repe
   for (const category of CATEGORIES) {
     assert.deepEqual(
       await parseRequest(
-        `Please send me the latest five ${category.toLowerCase()} for matter m12345.`,
+        `Please send me the ${category.toLowerCase()} for matter m12345.`,
         { mode: "rules", codexPath: "/never/start/codex" },
       ),
       {
@@ -109,6 +109,46 @@ test("rules parse every canonical category, normalize case, and deduplicate repe
     request: { matterNumber: "M12345", category: "Exhibits" },
     source: "rules",
   });
+});
+
+test("auto mode uses no subprocess for a canonical email and keeps subject conflicts visible", async () => {
+  const options = { mode: "auto" as const, codexPath: "/never/start/codex" };
+  assert.deepEqual(
+    await parseRequest("Request\n\nPlease send Exhibits for M12345", options),
+    {
+      kind: "request",
+      request: { matterNumber: "M12345", category: "Exhibits" },
+      source: "rules",
+    },
+  );
+  for (const text of [
+    "M12345 Exhibits\n\nPlease send Exhibits for M54321",
+    "M12345 Exhibits\n\nPlease send Transcripts for M12345",
+  ])
+    assert.equal((await parseRequest(text, options)).kind, "clarification");
+});
+
+test("unsupported counts, dates and sort orders are clarified without invoking Codex", async () => {
+  for (const mode of ["codex", "auto", "rules"] as const) {
+    for (const constraint of [
+      "latest five Exhibits",
+      "five Exhibits",
+      "2 of the Exhibits",
+      "Exhibits: 3",
+      "Exhibits since 2025",
+      "Exhibits sorted by date",
+    ]) {
+      const parsed = await parseRequest(
+        `Please send ${constraint} for M12345`,
+        { mode, codexPath: "/never/start/codex" },
+      );
+      assert.equal(parsed.kind, "clarification");
+      if (parsed.kind === "clarification") {
+        assert.match(parsed.message, /default order/);
+        assert.match(parsed.message, /Please send Exhibits for M12345/);
+      }
+    }
+  }
 });
 
 test("missing, malformed, and multiple matter numbers or categories require clarification", async () => {
@@ -635,7 +675,7 @@ test(
   { skip: process.env.RUN_CODEX_INTEGRATION !== "1" },
   async () => {
     const parsed = await parseRequest(
-      "Please send the latest five Exhibits for matter M12345.",
+      "Please send the Exhibits for matter M12345.",
       { mode: "codex", timeoutMs: 60_000, model: process.env.CODEX_MODEL },
     );
     assert.deepEqual(parsed, {
