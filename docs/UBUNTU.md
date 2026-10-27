@@ -4,6 +4,11 @@ This is a local worker. It needs outbound internet, power, and an awake laptop.
 It does not require SSH, a public web server, a tunnel, or inbound ports.
 The application polls AgentMail over HTTPS and runs Chromium locally.
 
+To run the independent Markdown agent alongside this worker, use the separate
+[agent deployment guide](../agent-deployment/README.md). It has its own inbox,
+key, Codex login, state and timer; do not point either worker at the other's
+inbox or runtime files.
+
 ## 1. Copy the project
 
 Copy the source and lockfile to Ubuntu. Install Node.js **24 or newer**, npm,

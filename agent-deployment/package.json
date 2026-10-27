@@ -1,0 +1,23 @@
+{
+  "name": "senpilot-markdown-agent-deployment",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "configure": "node cli.mjs configure",
+    "doctor": "node cli.mjs doctor",
+    "tools:check": "node tools-check.mjs",
+    "poll": "node cli.mjs poll",
+    "status": "node cli.mjs status",
+    "install:service": "node cli.mjs install-service",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/mcp": "0.0.83",
+    "agentmail-mcp": "1.1.0"
+  }
+}

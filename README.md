@@ -151,6 +151,10 @@ the Ubuntu setup helpers, and `docs/` operating/test/demo notes. `.env`,
 
 The independent alternative approach remains untouched at
 `agent-experiment/SENPILOT_AGENT.md`. It is not part of this worker.
+The separate [Markdown agent deployment guide](agent-deployment/README.md)
+provides a prepared Ubuntu runner and acceptance plan for operating both inboxes
+in parallel. Its automatic service is not enabled by setup; Ubuntu and recipient
+delivery checks must be completed before advertising availability.
 
 ## Development disclosure
 
@@ -158,5 +162,5 @@ This project was developed with Codex, including delegated implementation and
 review tasks. Planning/exploration, implementation, live tests, discovered
 limitations and repairs are documented in [the work log](docs/WORK_LOG.md).
 The applicant should understand and explain the implementation, actual time
-spent, AI assistance, and remaining limitations in the demo. No repository
-has been pushed and no submission email has been sent.
+spent, AI assistance, and remaining limitations in the demo. No submission
+email has been sent.
